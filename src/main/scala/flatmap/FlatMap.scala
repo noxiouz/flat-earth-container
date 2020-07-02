@@ -16,7 +16,6 @@ sealed class FlatMap[K, +V] private (
     with StrictOptimizedSortedMapOps[K, V, FlatMap, FlatMap[K, V]]
     with SortedMapFactoryDefaults[K, V, FlatMap, Iterable, Map] {
 
-  // protected def elemTag = ClassTag.Long
   assert(
     keysArr.size == valuesArr.size,
     s"keysArr.size ${keysArr.size} must be equal to valueArr.size ${valuesArr.size}"
@@ -115,8 +114,7 @@ sealed class FlatMap[K, +V] private (
 
   override def knownSize: Int = keysArr.size
 
-  // similar to java.util.TreeMap.floorEntry()
-  def floorEntry(key: K): Option[(K, V)] = {
+  override def maxBefore(key: K): Option[(K, V)] = {
     keysArr.search(key) match {
       case Found(index) => Some((keysArr(index), valuesArr(index)))
       case InsertionPoint(index) if index > 0 =>

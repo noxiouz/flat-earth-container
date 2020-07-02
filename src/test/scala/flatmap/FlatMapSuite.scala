@@ -88,7 +88,7 @@ class FlatMapSuite extends AnyFunSuite with should.Matchers {
       val javaMapEntry = Option(
         javaMap.floorEntry(k)
       ).map { item => (item.getKey(), item.getValue()) }
-      flatmap.floorEntry(k) shouldEqual javaMapEntry
+      flatmap.maxBefore(k) shouldEqual javaMapEntry
     }
 
     val (min, _) = pairs.minBy {
@@ -98,7 +98,7 @@ class FlatMapSuite extends AnyFunSuite with should.Matchers {
     val javaMapEntry = Option(
       javaMap.floorEntry(min - 100)
     ).map { item => (item.getKey(), item.getValue()) }
-    flatmap.floorEntry(min - 100) shouldEqual javaMapEntry
+    flatmap.maxBefore(min - 100) shouldEqual javaMapEntry
   }
 
   test("map builder") {
