@@ -1,14 +1,12 @@
 package flatmap
 
 import scala.collection.immutable._
+import scala.collection.mutable.ReusableBuilder
+import scala.collection.{SortedMapFactory, SortedMapFactoryDefaults}
+import scala.collection.Searching.{Found, InsertionPoint}
 import scala.collection.mutable
-import scala.collection.SortedMapFactory
-import scala.collection.SortedMapFactoryDefaults
-import scala.collection.Searching.Found
-import scala.collection.Searching.InsertionPoint
-import scala.reflect.ClassTag
 
-final class FlatMap[K, +V] private (
+sealed class FlatMap[K, +V] private (
     // TODO: use ArraySeq
     private val keysArr: IndexedSeq[K],
     private val valuesArr: IndexedSeq[V]
@@ -18,6 +16,7 @@ final class FlatMap[K, +V] private (
     with StrictOptimizedSortedMapOps[K, V, FlatMap, FlatMap[K, V]]
     with SortedMapFactoryDefaults[K, V, FlatMap, Iterable, Map] {
 
+  // protected def elemTag = ClassTag.Long
   assert(
     keysArr.size == valuesArr.size,
     s"keysArr.size ${keysArr.size} must be equal to valueArr.size ${valuesArr.size}"
@@ -116,19 +115,27 @@ final class FlatMap[K, +V] private (
 
   override def knownSize: Int = keysArr.size
 
+  // similar to java.util.TreeMap.floorEntry()
+  def floorEntry(key: K): Option[(K, V)] = {
+    keysArr.search(key) match {
+      case Found(index) => Some((keysArr(index), valuesArr(index)))
+      case InsertionPoint(index) if index > 0 =>
+        Some((keysArr(index - 1), valuesArr(index - 1)))
+      case _ => None
+    }
+  }
+
   override protected[this] def className = "FlatMap"
 }
 
 object FlatMap extends SortedMapFactory[FlatMap] {
 
-//   override def apply[K: Ordering, V](elems: (K, V)*): FlatMap[K,V] = ???
   def empty[K: Ordering, V]: FlatMap[K, V] =
-    new FlatMap()
+    new FlatMap(IndexedSeq.empty, IndexedSeq.empty)
 
   def from[K, V](
       it: IterableOnce[(K, V)]
   )(implicit ordering: Ordering[K]): FlatMap[K, V] = {
-    // TODO: optimize creation
     it match {
       case fm: FlatMap[K, V] if fm.ordering == ordering => fm
       case _ => {
@@ -140,5 +147,41 @@ object FlatMap extends SortedMapFactory[FlatMap] {
     }
   }
 
-  def newBuilder[K: Ordering, V]: mutable.Builder[(K, V), FlatMap[K, V]] = ???
+  def newBuilder[K, V](
+      implicit ordering: Ordering[K]
+  ): ReusableBuilder[(K, V), FlatMap[K, V]] =
+    new ReusableBuilder[(K, V), FlatMap[K, V]] {
+      private[this] var tree: TreeMap[K, V] = TreeMap.empty
+
+      def addOne(elem: (K, V)): this.type = {
+        tree = tree.updated(elem._1, elem._2)
+        this
+      }
+
+      override def addAll(xs: IterableOnce[(K, V)]): this.type = {
+        val it = xs.iterator
+        while (it.hasNext) {
+          val (k, v) = it.next()
+          tree = tree.updated(k, v)
+        }
+        this
+      }
+
+      def result(): FlatMap[K, V] =
+        if (tree.isEmpty) FlatMap.empty else FlatMap.from(tree)
+
+      def clear(): Unit = { tree = TreeMap.empty }
+    }
+
+  class OfLongKey[+V]
+      extends FlatMap[Long, V](
+        ArraySeq.empty,
+        IndexedSeq.empty
+      )
+
+  class ofIntKey[+V]
+      extends FlatMap[Int, V](
+        ArraySeq.empty,
+        IndexedSeq.empty
+      )
 }

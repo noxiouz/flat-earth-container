@@ -5,6 +5,7 @@ import scala.collection.immutable.TreeMap
 import flatmap.FlatMap
 
 import java.util.concurrent.TimeUnit
+import java.util.{TreeMap => JavaTreeMap}
 
 import org.openjdk.jmh.annotations.{
   Benchmark,
@@ -15,8 +16,8 @@ import org.openjdk.jmh.annotations.{
   Scope
 }
 
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
-@BenchmarkMode(Array(Mode.Throughput))
+@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@BenchmarkMode(Array(Mode.AverageTime))
 @State(Scope.Benchmark)
 class FlatMapBencchmark {
 
@@ -26,6 +27,13 @@ class FlatMapBencchmark {
 
     val treeMap = TreeMap.from(pairs)
     val flatMap = FlatMap.from(pairs)
+    val javaTreeMap = {
+      val m = new JavaTreeMap[Int, String]()
+      for ((k, v) <- pairs) {
+        m.put(k, v)
+      }
+      m
+    }
 
     val shuffledKeys = Random.shuffle(keys)
 
@@ -40,6 +48,13 @@ class FlatMapBencchmark {
   @Benchmark
   def lookupAllKeysFlatMap: Unit = {
     lookupAllKeys(Init.flatMap)
+  }
+
+  @Benchmark
+  def lookupAllKeysJavaTreeMap: Unit = {
+    for (k <- Init.shuffledKeys) {
+      assert(Init.javaTreeMap.containsKey(k))
+    }
   }
 
   @Benchmark

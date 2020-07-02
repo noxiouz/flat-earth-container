@@ -6,6 +6,8 @@ import org.scalatest._
 import funsuite._
 import matchers._
 
+import java.util.{TreeMap => JavaTreeMap}
+
 class FlatMapSuite extends AnyFunSuite with should.Matchers {
   val pairs = Seq((5, "A"), (6, "C"), (1, "E"), (10, "F"))
 
@@ -21,11 +23,9 @@ class FlatMapSuite extends AnyFunSuite with should.Matchers {
     flatmap.nonEmpty shouldBe true
   }
 
-  // TODO: it does not work, fix it
-  //  diverging implicit expansion for type scala.math.Ordering[T1]
-  // test("FlatMap iEmpty") {
-  //   FlatMap.empty should be(empty)
-  // }
+  test("FlatMap iEmpty") {
+    FlatMap.empty[Int, String] should be(empty)
+  }
 
   test("against.TreeMap iterator order") {
     val (map, flatmap) = createMaps()
@@ -75,5 +75,42 @@ class FlatMapSuite extends AnyFunSuite with should.Matchers {
 
     flatmap(nonExistsKey) shouldEqual (nonExistsValue)
     flatmap shouldEqual map
+  }
+
+  test("java.util.TreeMap.floorEntry comparison") {
+    val (_, flatmap) = createMaps()
+    val javaMap = new JavaTreeMap[Int, String]()
+    for ((k, v) <- pairs) {
+      javaMap.put(k, v)
+    }
+
+    for ((k, _) <- pairs) {
+      val javaMapEntry = Option(
+        javaMap.floorEntry(k)
+      ).map { item => (item.getKey(), item.getValue()) }
+      flatmap.floorEntry(k) shouldEqual javaMapEntry
+    }
+
+    val (min, _) = pairs.minBy {
+      case (k, _) => k
+    }
+
+    val javaMapEntry = Option(
+      javaMap.floorEntry(min - 100)
+    ).map { item => (item.getKey(), item.getValue()) }
+    flatmap.floorEntry(min - 100) shouldEqual javaMapEntry
+  }
+
+  test("map builder") {
+    val builder = FlatMap.newBuilder[Int, String]
+    for ((k, v) <- pairs) {
+      builder.addOne((k, v))
+    }
+    builder.result() shouldEqual immutable.TreeMap.from(pairs)
+  }
+
+  test("map builder reset") {
+    val builder = FlatMap.newBuilder[Int, String]
+    builder.result() shouldBe (empty)
   }
 }
